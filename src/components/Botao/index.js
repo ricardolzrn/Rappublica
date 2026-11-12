@@ -1,6 +1,6 @@
-import React from 'react';
-import { Pressable, Text } from 'react-native';
-import { styles } from './styles';
+import React from "react";
+import { Pressable, Text } from "react-native";
+import { styles } from "./styles";
 
 export default function Botao({ titulo, onPress }) {
   return (

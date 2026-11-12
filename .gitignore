@@ -39,3 +39,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Banco local da API
+server/data/
+
+# Resultados dos testes de interface
+test-results/
+playwright-report/

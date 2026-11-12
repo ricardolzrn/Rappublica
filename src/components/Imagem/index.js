@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Image, Text } from 'react-native';
-import { styles } from './styles';
+import React from "react";
+import { View, Image, Text } from "react-native";
+import { styles } from "./styles";
 
 export default function Imagem({ url, largura = 150, altura = 150, legenda }) {
   return (

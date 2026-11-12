@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text, Pressable } from 'react-native';
-import { styles } from './styles'; // 👈 Importação relativa da mesma pasta
+import React from "react";
+import { View, Text, Pressable } from "react-native";
+import { styles } from "./styles"; // 👈 Importação relativa da mesma pasta
 
 export default function Header({ titulo, mostrarVoltar, onVoltar }) {
   return (

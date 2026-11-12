@@ -1,99 +1,142 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, Pressable } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import Imagem from '../../components/Imagem';
-import Input from '../../components/Input';
-import { styles } from './styles';
-
-export default function ListaMoradores({ moradores, onEditar, onRemover }) {
-  const [idEdicao, setIdEdicao] = useState(null);
-  const [nomeEditado, setNomeEditado] = useState('');
-  const [emailEditado, setEmailEditado] = useState('');
-  const [quartoEditado, setQuartoEditado] = useState('Suíte');
-
-  function iniciarEdicao(morador) {
-    setIdEdicao(morador.id);
-    setNomeEditado(morador.nome);
-    setEmailEditado(morador.email);
-    setQuartoEditado(morador.quarto);
-  }
-
-  function salvarEdicao(id) {
-    if (!nomeEditado.trim() || !emailEditado.trim()) {
-      alert('Preencha o nome e o e-mail!');
-      return;
-    }
-    onEditar(id, { nome: nomeEditado, email: emailEditado, quarto: quartoEditado });
-    setIdEdicao(null);
-  }
-
+import React, { useState } from "react";
+import { FlatList, Text, View } from "react-native";
+import useResource from "../../hooks/useResource";
+import { useApp } from "../../contexts/AppContext";
+import {
+  Button,
+  Heading,
+  Empty,
+  Feedback,
+  Badge,
+  Confirm,
+  useAction,
+} from "../../components/ui";
+import { colors, s } from "../../theme";
+import { moeda } from "../../utils/format";
+export default function ListaMoradores({ navigation }) {
+  const r = useResource("/moradores"),
+    { mutate } = useApp(),
+    a = useAction();
+  const [selected, setSelected] = useState(null);
+  const excluir = () =>
+    a.run(async () => {
+      await mutate(`/moradores/${selected.id}`, "DELETE");
+      setSelected(null);
+      await r.reload();
+    });
   return (
-    <View style={styles.container}>
-      <Text style={styles.titulo}>Moradores Ativos ({moradores.length})</Text>
-
+    <View style={s.page}>
       <FlatList
-        data={moradores}
-        extraData={moradores}
+        contentContainerStyle={s.content}
+        data={r.data || []}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => {
-          const estaEditando = idEdicao === item.id;
-
-          return (
-            <View style={styles.cardItem}>
-              {estaEditando ? (
-                <View style={{ flex: 1 }}>
-                  <Input label="Nome" value={nomeEditado} onChangeText={setNomeEditado} />
-                  <Input label="E-mail" value={emailEditado} onChangeText={setEmailEditado} />
-                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#333', marginTop: 6 }}>
-                    Quarto:
-                  </Text>
-                  <Picker
-                    selectedValue={quartoEditado}
-                    onValueChange={setQuartoEditado}
-                    style={{ backgroundColor: '#F1F5F9', marginVertical: 6 }}
-                  >
-                    <Picker.Item label="Suíte Presidencial" value="Suíte" />
-                    <Picker.Item label="Quarto Individual 1" value="Individual 1" />
-                    <Picker.Item label="Quarto Duplo" value="Duplo" />
-                  </Picker>
-
-                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 }}>
-                    <Pressable
-                      onPress={() => salvarEdicao(item.id)}
-                      style={{ backgroundColor: '#16A34A', padding: 8, borderRadius: 6, marginRight: 8 }}
-                    >
-                      <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 12 }}>✓ Salvar</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setIdEdicao(null)}
-                      style={{ backgroundColor: '#CBD5E1', padding: 8, borderRadius: 6 }}
-                    >
-                      <Text style={{ color: '#334155', fontWeight: 'bold', fontSize: 12 }}>Cancelar</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <Imagem url="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" largura={45} altura={45} />
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.nome}>{item.nome}</Text>
-                    <Text style={styles.detalhe}>Quarto: {item.quarto}</Text>
-                    <Text style={styles.detalhe}>{item.email}</Text>
-                  </View>
-
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Pressable onPress={() => iniciarEdicao(item)} style={{ marginBottom: 8 }}>
-                      <Text style={{ color: '#0284C7', fontWeight: 'bold', fontSize: 13 }}>✏️ Editar</Text>
-                    </Pressable>
-                    <Pressable onPress={() => onRemover(item.id)}>
-                      <Text style={{ color: '#EF4444', fontWeight: 'bold', fontSize: 13 }}>🗑️ Excluir</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
+        refreshing={r.loading && !!r.data}
+        onRefresh={r.reload}
+        ListHeaderComponent={
+          <View style={{ gap: 18 }}>
+            <Heading
+              title="Quem divide a casa"
+              subtitle="Moradores, quartos e acertos em um só lugar."
+            />
+            <Button
+              title="Novo morador"
+              icon="person-add-outline"
+              onPress={() => navigation.navigate("CadastrarMorador")}
+            />
+            <Feedback resource={r} />
+            {a.error && !selected ? (
+              <Text accessibilityRole="alert" style={s.error}>
+                {a.error}
+              </Text>
+            ) : null}
+          </View>
+        }
+        ListEmptyComponent={
+          !r.loading && r.data ? (
+            <Empty
+              title="A casa está vazia"
+              text="Cadastre o primeiro morador para começar a dividir despesas."
+            />
+          ) : null
+        }
+        renderItem={({ item }) => (
+          <View style={s.card}>
+            <View style={s.row}>
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 16,
+                  backgroundColor: colors.soft,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 18,
+                    color: colors.primary,
+                    fontWeight: "800",
+                  }}
+                >
+                  {item.nome
+                    .split(" ")
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((n) => n[0])
+                    .join("")}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.text, { fontWeight: "700" }]}>{item.nome}</Text>
+                <Text style={s.small}>{item.quarto}</Text>
+              </View>
             </View>
-          );
-        }}
+            <Text style={s.subtitle}>{item.email}</Text>
+            <Badge
+              label={
+                item.pendenteCentavos
+                  ? `${moeda(item.pendenteCentavos)} pendente no histórico`
+                  : "Sem parcelas pendentes"
+              }
+              good={!item.pendenteCentavos}
+            />
+            <View style={s.row}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Editar"
+                  accessibilityLabel={`Editar ${item.nome}`}
+                  secondary
+                  disabled={r.offline || a.busy}
+                  onPress={() =>
+                    navigation.navigate("CadastrarMorador", { id: item.id })
+                  }
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Excluir"
+                  accessibilityLabel={`Excluir ${item.nome}`}
+                  secondary
+                  disabled={r.offline || a.busy}
+                  onPress={() => {
+                    a.setError("");
+                    setSelected(item);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        )}
+      />
+      <Confirm
+        error={a.error}
+        visible={!!selected}
+        title="Excluir morador?"
+        text="Moradores que participam de despesas não podem ser removidos, para preservar o histórico."
+        onCancel={() => setSelected(null)}
+        onConfirm={excluir}
+        busy={a.busy}
       />
     </View>
   );

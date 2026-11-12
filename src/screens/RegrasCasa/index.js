@@ -1,136 +1,183 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Switch, Pressable } from 'react-native';
-import Input from '../../components/Input';
-import Botao from '../../components/Botao';
-import { styles } from './styles';
-
-export default function RegrasCasa({
-  regras,
-  moradores,
-  onAdicionar,
-  onEditar,
-  onRemover,
-  onToggleAceite,
-}) {
-  
-  const [novoTitulo, setNovoTitulo] = useState('');
-  const [novoTexto, setNovoTexto] = useState('');
-
-  const [idEdicao, setIdEdicao] = useState(null);
-  const [tituloEditado, setTituloEditado] = useState('');
-  const [textoEditado, setTextoEditado] = useState('');
-
-  function handleAdicionar() {
-    if (!novoTitulo.trim() || !novoTexto.trim()) {
-      alert('Preencha o título e a descrição da regra!');
-      return;
-    }
-    onAdicionar({ titulo: novoTitulo, texto: novoTexto });
-    setNovoTitulo('');
-    setNovoTexto('');
-  }
-
-  function iniciarEdicao(regra) {
-    setIdEdicao(regra.id);
-    setTituloEditado(regra.titulo);
-    setTextoEditado(regra.texto);
-  }
-
-  function salvarEdicao(id) {
-    if (!tituloEditado.trim() || !textoEditado.trim()) {
-      alert('O título e a descrição não podem estar vazios!');
-      return;
-    }
-    onEditar(id, tituloEditado, textoEditado);
-    setIdEdicao(null);
-  }
-
+import React, { useState } from "react";
+import { Text, View, Switch } from "react-native";
+import useResource from "../../hooks/useResource";
+import { useApp } from "../../contexts/AppContext";
+import {
+  Button,
+  Heading,
+  Field,
+  Page,
+  Empty,
+  Badge,
+  Confirm,
+  useAction,
+} from "../../components/ui";
+import { colors, s } from "../../theme";
+export default function RegrasCasa() {
+  const r = useResource("/regras"),
+    { mutate } = useApp(),
+    a = useAction();
+  const [form, setForm] = useState({ titulo: "", texto: "" }),
+    [editing, setEditing] = useState(null),
+    [selected, setSelected] = useState(null);
+  const save = () =>
+    a.run(async () => {
+      if (!form.titulo.trim() || !form.texto.trim())
+        throw new Error("Preencha o título e a descrição da regra.");
+      await mutate(
+        `/regras${editing ? `/${editing}` : ""}`,
+        editing ? "PUT" : "POST",
+        form,
+      );
+      setForm({ titulo: "", texto: "" });
+      setEditing(null);
+      await r.reload();
+    });
+  const remove = () =>
+    a.run(async () => {
+      await mutate(`/regras/${selected}`, "DELETE");
+      if (editing === selected) {
+        setEditing(null);
+        setForm({ titulo: "", texto: "" });
+      }
+      setSelected(null);
+      await r.reload();
+    });
+  const accept = (regra, id, value) =>
+    a.run(async () => {
+      await mutate(`/regras/${regra}/aceites/${id}`, "PATCH", {
+        aceitou: value,
+      });
+      await r.reload();
+    });
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <Text style={styles.titulo}>Estatuto e Regras Internas</Text>
-
-      <View style={styles.boxFormAdicionar}>
-        <Text style={styles.subtituloSecao}>➕ Adicionar Nova Regra</Text>
-        <Input
-          label="Título da Regra"
-          placeholder="Ex: Uso da Garagem"
-          value={novoTitulo}
-          onChangeText={setNovoTitulo}
-        />
-        <Input
-          label="Descrição/Instruções"
-          placeholder="Ex: Respeitar as vagas demarcadas..."
-          value={novoTexto}
-          onChangeText={setNovoTexto}
-        />
-        <Botao titulo="Salvar Regra" onPress={handleAdicionar} />
-      </View>
-
-      <Text style={styles.subtituloSecao}>Regras Ativas ({regras.length})</Text>
-
-      {regras.map((item, index) => {
-        const estaEditando = idEdicao === item.id;
-
-        return (
-          <View key={item.id} style={styles.cardRegra}>
-            {estaEditando ? (
-              <View>
-                <Input label="Título" value={tituloEditado} onChangeText={setTituloEditado} />
-                <Input label="Descrição" value={textoEditado} onChangeText={setTextoEditado} />
-                <View style={styles.rowAcoesEdicao}>
-                  <Pressable style={styles.btnSalvar} onPress={() => salvarEdicao(item.id)}>
-                    <Text style={styles.txtBtnBranco}>✓ Salvar</Text>
-                  </Pressable>
-                  <Pressable style={styles.btnCancelar} onPress={() => setIdEdicao(null)}>
-                    <Text style={styles.txtBtnCinza}>Cancelar</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <View>
-                <Text style={styles.tituloRegra}>
-                  {index + 1}. {item.titulo}
-                </Text>
-                <Text style={styles.textoRegra}>{item.texto}</Text>
-
-                <View style={styles.rowAcoes}>
-                  <Pressable onPress={() => iniciarEdicao(item)}>
-                    <Text style={styles.txtAcaoEditar}>✏️ Editar</Text>
-                  </Pressable>
-                  <Pressable onPress={() => onRemover(item.id)}>
-                    <Text style={styles.txtAcaoExcluir}>🗑️️ Eliminar</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-          </View>
-        );
-      })}
-
-      <Text style={[styles.subtituloSecao, { marginTop: 25 }]}>
-        Adesão dos Integrantes ({moradores.length})
-      </Text>
-
-      {moradores.map((m) => (
-        <View key={m.id} style={styles.cardAdesao}>
-          <View>
-            <Text style={styles.nomeMorador}>{m.nome}</Text>
-            <Text
-              style={[
-                styles.statusAdesao,
-                { color: m.aceitouRegras ? '#16A34A' : '#DC2626' },
-              ]}
-            >
-              {m.aceitouRegras ? '✓ Assinado' : '⏳ Pendente'}
+    <Page resource={r}>
+      <Heading
+        title="Combinado é combinado."
+        subtitle="Registre as regras e acompanhe o aceite de cada morador."
+      />
+      {r.data ? (
+        <>
+          <View style={s.card}>
+            <Text style={s.section}>
+              {editing ? "Editar combinado" : "Novo combinado"}
             </Text>
+            <Field
+              label="Título da regra"
+              placeholder="Ex.: Limpeza da cozinha"
+              maxLength={100}
+              value={form.titulo}
+              onChangeText={(v) => setForm((f) => ({ ...f, titulo: v }))}
+            />
+            <Field
+              label="Descrição da regra"
+              placeholder="O que todos precisam saber?"
+              multiline
+              maxLength={1000}
+              value={form.texto}
+              onChangeText={(v) => setForm((f) => ({ ...f, texto: v }))}
+            />
+            {editing ? (
+              <Text style={s.small}>
+                Ao salvar a edição, os aceites serão limpos para que todos
+                confirmem a nova versão.
+              </Text>
+            ) : null}
+            <Button
+              title={editing ? "Salvar regra" : "Adicionar regra"}
+              icon="checkmark"
+              loading={a.busy}
+              disabled={r.offline}
+              onPress={save}
+            />
+            {editing ? (
+              <Button
+                title="Cancelar edição"
+                secondary
+                onPress={() => {
+                  setEditing(null);
+                  setForm({ titulo: "", texto: "" });
+                }}
+              />
+            ) : null}
           </View>
-          <Switch
-            value={m.aceitouRegras}
-            onValueChange={() => onToggleAceite(m.id)}
-            thumbColor={m.aceitouRegras ? '#2563EB' : '#CCC'}
+          {a.error && !selected ? (
+            <Text accessibilityRole="alert" style={s.error}>
+              {a.error}
+            </Text>
+          ) : null}
+          <Text style={s.section}>
+            Regras em vigor ({r.data.regras.length})
+          </Text>
+          {!r.data.regras.length ? (
+            <Empty
+              title="Vamos combinar?"
+              text="Adicione a primeira regra de convivência."
+            />
+          ) : null}
+          {r.data.regras.map((regra) => (
+            <View key={regra.id} style={s.card}>
+              <Text style={s.section}>{regra.titulo}</Text>
+              <Text style={s.text}>{regra.texto}</Text>
+              <Badge
+                label={`${regra.aceites.length} de ${r.data.moradores.length} aceites`}
+                good={
+                  r.data.moradores.length > 0 &&
+                  regra.aceites.length === r.data.moradores.length
+                }
+              />
+              <View style={s.row}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Editar"
+                    accessibilityLabel={`Editar regra: ${regra.titulo}`}
+                    secondary
+                    disabled={r.offline || a.busy}
+                    onPress={() => {
+                      setEditing(regra.id);
+                      setForm({ titulo: regra.titulo, texto: regra.texto });
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Excluir"
+                    accessibilityLabel={`Excluir regra: ${regra.titulo}`}
+                    secondary
+                    disabled={r.offline || a.busy}
+                    onPress={() => {
+                      a.setError("");
+                      setSelected(regra.id);
+                    }}
+                  />
+                </View>
+              </View>
+              <View style={s.separator} />
+              {r.data.moradores.map((m) => (
+                <View key={m.id} style={s.between}>
+                  <Text style={[s.text, { flex: 1 }]}>{m.nome}</Text>
+                  <Switch
+                    accessibilityLabel={`Aceite de ${m.nome} para ${regra.titulo}`}
+                    value={regra.aceites.includes(m.id)}
+                    disabled={r.offline || a.busy}
+                    onValueChange={(v) => accept(regra.id, m.id, v)}
+                    trackColor={{ true: colors.green, false: colors.line }}
+                  />
+                </View>
+              ))}
+            </View>
+          ))}
+          <Confirm
+            error={a.error}
+            visible={!!selected}
+            title="Excluir regra?"
+            text="O combinado e os aceites registrados serão removidos."
+            onCancel={() => setSelected(null)}
+            onConfirm={remove}
+            busy={a.busy}
           />
-        </View>
-      ))}
-    </ScrollView>
+        </>
+      ) : null}
+    </Page>
   );
 }
