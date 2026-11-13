@@ -4,7 +4,7 @@ O Rappublica organiza as contas e os combinados de uma república universitária
 
 ## Funcionalidades
 
-- Login individual com perfis de **administrador** e **morador**.
+- Cadastro da primeira conta de administrador no app, login individual e perfis de **administrador** e **morador**.
 - Convites para um morador já cadastrado, com prazo de 1 a 720 horas e uso único. Gerar outro convite para a mesma pessoa revoga os anteriores ainda pendentes.
 - Gestão de moradores, despesas, regras e dados da república pelo administrador.
 - Registro de pagamento e aceite somente pelo próprio morador, inclusive quando seu perfil é de administrador. Não há etapa de aprovação de pagamento.
@@ -23,13 +23,15 @@ Use **Node.js 22.13 ou superior**. Instale as dependências na pasta do projeto:
 npm ci
 ```
 
-Na primeira execução, escolha o e-mail de um morador que já existe no banco e crie sua conta de administrador. No banco de exemplo, `ricardo@example.com` é um dos três moradores:
+Inicie a API:
 
 ```bash
-ADMIN_EMAIL=ricardo@example.com ADMIN_PASSWORD='uma-senha-forte-com-12-caracteres' npm run api
+npm run api
 ```
 
-As duas variáveis só criam a conta se ainda não houver administrador. Reiniciar a API não redefine a senha. Para um banco já preenchido, use o e-mail exato de um morador existente. Uma instalação nova cria os três moradores de exemplo; se você usa um banco vazio criado separadamente, importe o primeiro morador antes de criar a conta inicial. Guarde a senha inicial e não compartilhe o código de convite em um canal público.
+Ao abrir o app pela primeira vez, use **Primeira conta** para cadastrar o administrador. Esse cadastro fica disponível apenas enquanto não existe nenhuma conta. Se o e-mail já pertencer a um morador do banco, a conta é ligada ao cadastro existente e preserva seu histórico; caso contrário, o morador é criado. Conclua esse primeiro cadastro antes de expor uma instalação nova da API em uma rede pública.
+
+Para instalações automatizadas, ainda é possível criar o primeiro administrador ao iniciar a API com `ADMIN_EMAIL` e `ADMIN_PASSWORD`. Nesse caso, o e-mail deve pertencer a um morador existente, e reiniciar a API não redefine a senha.
 
 Em outro terminal, inicie o app:
 
@@ -47,13 +49,13 @@ Substitua o IP pelo endereço do computador na rede do celular. Em uma página H
 
 ## Contas e convites
 
-1. O administrador entra com o e-mail e a senha inicial.
+1. A primeira pessoa cria a conta de administrador em **Primeira conta**, com nome, e-mail, quarto e senha.
 2. Em **Moradores**, cadastra quem ainda não consta na república.
 3. Em **Casa → Acessos e convites**, escolhe um morador sem conta, o perfil e a validade do convite. O código aparece uma vez para ser compartilhado diretamente com a pessoa.
-4. O morador abre **Ativar convite**, informa o código e cria sua senha de 12 a 128 caracteres. Sua conta é vinculada ao ID do cadastro existente; parcelas e aceites anteriores continuam associados a esse morador.
+4. O morador abre **Criar conta com convite**, informa o código e cria sua senha de 12 a 128 caracteres. Sua conta é vinculada ao ID do cadastro existente; parcelas e aceites anteriores continuam associados a esse morador.
 5. Depois da ativação, o morador entra com seu e-mail e senha. Um convite usado, revogado ou vencido não pode ser reutilizado.
 
-O administrador pode consultar pagamentos e aceites de todos, mas não pode marcá-los por outras pessoas. Qualquer tentativa de alterar outro morador é recusada também pela API. O login limita tentativas repetidas por endereço de origem e e-mail. Sessões duram sete dias; sair da conta revoga a sessão no servidor quando ele está acessível. Alterar o endereço da API encerra a sessão local.
+O administrador pode consultar pagamentos e aceites de todos, mas não pode marcá-los por outras pessoas. Qualquer tentativa de alterar outro morador é recusada também pela API. O login limita tentativas repetidas por endereço de origem e e-mail. Sessões duram sete dias. Em **Casa → Sair e entrar com outra conta**, a pessoa encerra a sessão e volta à tela de entrada para usar outro e-mail. Alterar o endereço da API também encerra a sessão local.
 
 ## Dados e histórico
 
@@ -89,7 +91,7 @@ e2e/             Testes de interface
 
 ## API e testes
 
-A API local fica em `http://localhost:3001/api`. `/health`, `/auth/login`, a consulta de convite e `/auth/convites/aceitar` são públicos. As demais rotas exigem `Authorization: Bearer <token>`. Criação e edição de cadastros, despesas, regras, república e convites exigem administrador. As rotas de parcelas e aceites conferem o ID do morador autenticado. Erros retornam status HTTP e `message`.
+A API local fica em `http://localhost:3001/api`. `/health`, `/auth/estado`, `/auth/primeiro-acesso`, `/auth/login`, a consulta de convite e `/auth/convites/aceitar` são públicos. `/auth/primeiro-acesso` aceita cadastro somente antes da primeira conta. As demais rotas exigem `Authorization: Bearer <token>`. Criação e edição de cadastros, despesas, regras, república e convites exigem administrador. As rotas de parcelas e aceites conferem o ID do morador autenticado. Erros retornam status HTTP e `message`.
 
 A porta e o caminho do banco podem ser definidos por `PORT` e `DB_PATH`. `DB_PATH=:memory:` cria um banco temporário. Para testar:
 
@@ -99,4 +101,4 @@ npm run test:e2e
 npm run format:check
 ```
 
-Os testes de API cobrem login, perfis, permissões, convites vencidos e de uso único, auditoria e migração de dados antigos. O teste de interface usa API em memória na porta `3101` e Expo na `8082`, sem alterar o banco de desenvolvimento. Se o Chromium não estiver instalado, execute `npx playwright install chromium`.
+Os testes de API cobrem primeiro cadastro, troca de conta, login, perfis, permissões, convites vencidos e de uso único, auditoria e migração de dados antigos. O teste de interface usa API em memória na porta `3101` e Expo na `8082`, sem alterar o banco de desenvolvimento. Se o Chromium não estiver instalado, execute `npx playwright install chromium`.
