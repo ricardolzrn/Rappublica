@@ -9,6 +9,7 @@ function createDatabase({
   if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec(`PRAGMA foreign_keys=ON;
+    PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS republica (id INTEGER PRIMARY KEY, nome TEXT NOT NULL, cep TEXT NOT NULL DEFAULT '', endereco TEXT NOT NULL DEFAULT '', numero TEXT NOT NULL DEFAULT '');
     CREATE TABLE IF NOT EXISTS moradores (id TEXT PRIMARY KEY, nome TEXT NOT NULL, email TEXT NOT NULL, quarto TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS despesas (id TEXT PRIMARY KEY, descricao TEXT NOT NULL, valorCentavos INTEGER NOT NULL, categoria TEXT NOT NULL, tipo TEXT NOT NULL, vencimento TEXT NOT NULL);
@@ -41,7 +42,7 @@ function createDatabase({
   const get = (sql, ...args) => db.prepare(sql).get(...args);
   const run = (sql, ...args) => db.prepare(sql).run(...args);
   const tx = (fn) => {
-    db.exec("BEGIN");
+    db.exec("BEGIN IMMEDIATE");
     try {
       const result = fn();
       db.exec("COMMIT");

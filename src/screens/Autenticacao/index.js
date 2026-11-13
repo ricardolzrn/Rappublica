@@ -1,14 +1,26 @@
-import React, { useState } from "react";
-import { Text, View } from "react-native";
-import { Button, Field, Heading, Page, useAction } from "../../components/ui";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
+import {
+  Button,
+  Chip,
+  Field,
+  Heading,
+  Page,
+  useAction,
+} from "../../components/ui";
 import { useApp } from "../../contexts/AppContext";
 import { normalizeUrl, request } from "../../services/api";
-import { s } from "../../theme";
+import { colors, s } from "../../theme";
 
 export default function Autenticacao() {
-  const { apiUrl, preferences, login, acceptInvite } = useApp();
+  const { apiUrl, preferences, login, createFirstAccount, acceptInvite } =
+    useApp();
   const [mode, setMode] = useState("login");
+  const [setup, setSetup] = useState(null);
+  const [setupError, setSetupError] = useState("");
+  const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
+  const [quarto, setQuarto] = useState("Duplo");
   const [senha, setSenha] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
   const [token, setToken] = useState("");
@@ -18,6 +30,38 @@ export default function Autenticacao() {
   const [connectionMessage, setConnectionMessage] = useState("");
   const action = useAction();
   const connection = useAction();
+  useEffect(() => {
+    let active = true;
+    setSetup(null);
+    setSetupError("");
+    request(apiUrl, "/auth/estado")
+      .then((result) => {
+        if (!active) return;
+        setSetup(result);
+        setMode((current) =>
+          result.primeiroAcessoDisponivel
+            ? "cadastro"
+            : current === "cadastro"
+              ? "login"
+              : current,
+        );
+      })
+      .catch((error) => {
+        if (active) setSetupError(error.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [apiUrl]);
+  const selectMode = (value) => {
+    setMode(value);
+    action.setError("");
+  };
+  const create = () =>
+    action.run(async () => {
+      if (senha !== confirmacao) throw new Error("As senhas não coincidem.");
+      await createFirstAccount({ nome, email, quarto, senha });
+    });
   const activate = () =>
     action.run(async () => {
       if (senha !== confirmacao) throw new Error("As senhas não coincidem.");
@@ -49,29 +93,85 @@ export default function Autenticacao() {
         subtitle="Sua casa, suas contas e seus combinados."
       />
       <View style={s.card}>
-        <View style={s.row}>
-          <View style={{ flex: 1 }}>
-            <Button
-              title="Entrar"
-              secondary={mode !== "login"}
-              onPress={() => {
-                setMode("login");
-                action.setError("");
-              }}
+        {setup === null && !setupError ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : null}
+        {setupError ? (
+          <Text accessibilityRole="alert" style={s.error}>
+            {setupError}
+          </Text>
+        ) : null}
+        <View style={s.chips}>
+          <Chip
+            label="Entrar"
+            active={mode === "login"}
+            onPress={() => selectMode("login")}
+          />
+          <Chip
+            label="Criar conta com convite"
+            active={mode === "convite"}
+            onPress={() => selectMode("convite")}
+          />
+          {setup?.primeiroAcessoDisponivel ? (
+            <Chip
+              label="Primeira conta"
+              active={mode === "cadastro"}
+              onPress={() => selectMode("cadastro")}
             />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button
-              title="Ativar convite"
-              secondary={mode !== "convite"}
-              onPress={() => {
-                setMode("convite");
-                action.setError("");
-              }}
-            />
-          </View>
+          ) : null}
         </View>
-        {mode === "login" ? (
+        {mode === "cadastro" && setup?.primeiroAcessoDisponivel ? (
+          <>
+            <Text style={s.section}>Crie a primeira conta</Text>
+            <Text style={s.subtitle}>
+              Esta será a conta de administrador. Se o e-mail já pertence a um
+              morador cadastrado, a conta será ligada ao histórico dele.
+            </Text>
+            <Field
+              label="Nome completo"
+              value={nome}
+              onChangeText={setNome}
+              maxLength={80}
+            />
+            <Field
+              label="E-mail"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              maxLength={150}
+            />
+            <Text style={s.label}>Quarto</Text>
+            <View style={s.chips}>
+              {setup.quartos.map((item) => (
+                <Chip
+                  key={item}
+                  label={item}
+                  active={quarto === item}
+                  onPress={() => setQuarto(item)}
+                />
+              ))}
+            </View>
+            <Field
+              label="Crie uma senha"
+              value={senha}
+              onChangeText={setSenha}
+              secureTextEntry
+            />
+            <Field
+              label="Confirme a senha"
+              value={confirmacao}
+              onChangeText={setConfirmacao}
+              secureTextEntry
+            />
+            <Text style={s.small}>Use de 12 a 128 caracteres.</Text>
+            <Button
+              title="Criar conta de administrador"
+              loading={action.busy}
+              onPress={create}
+            />
+          </>
+        ) : mode === "login" ? (
           <>
             <Text style={s.section}>Entre na sua conta</Text>
             <Field
@@ -93,7 +193,7 @@ export default function Autenticacao() {
               onPress={() => action.run(() => login(email, senha))}
             />
           </>
-        ) : (
+        ) : mode === "convite" ? (
           <>
             <Text style={s.section}>Ative sua conta</Text>
             <Text style={s.subtitle}>
@@ -150,7 +250,7 @@ export default function Autenticacao() {
               />
             )}
           </>
-        )}
+        ) : null}
         {action.error ? (
           <Text accessibilityRole="alert" style={s.error}>
             {action.error}

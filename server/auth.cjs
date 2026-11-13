@@ -5,7 +5,7 @@ const {
   scryptSync,
   timingSafeEqual,
 } = require("node:crypto");
-const { fail } = require("./validation.cjs");
+const { fail, quartos, texto } = require("./validation.cjs");
 
 const tokenHash = (token) => createHash("sha256").update(token).digest("hex");
 const timestamp = (date) => date.toISOString();
@@ -63,10 +63,14 @@ function createAuth(store, { bootstrapAdmin, now = () => new Date() } = {}) {
     );
 
   const setup =
-    bootstrapAdmin ||
-    (process.env.ADMIN_EMAIL || process.env.ADMIN_PASSWORD
-      ? { email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD }
-      : null);
+    bootstrapAdmin === undefined
+      ? process.env.ADMIN_EMAIL || process.env.ADMIN_PASSWORD
+        ? {
+            email: process.env.ADMIN_EMAIL,
+            password: process.env.ADMIN_PASSWORD,
+          }
+        : null
+      : bootstrapAdmin;
   if (
     setup &&
     !get("SELECT id FROM usuarios WHERE papel='administrador' LIMIT 1")
@@ -157,6 +161,65 @@ function createAuth(store, { bootstrapAdmin, now = () => new Date() } = {}) {
     return row;
   };
   function registerPublic(app) {
+    app.get("/api/auth/estado", (req, res) =>
+      res.json({
+        primeiroAcessoDisponivel: !get("SELECT 1 FROM usuarios LIMIT 1"),
+        quartos,
+      }),
+    );
+    app.post("/api/auth/primeiro-acesso", (req, res) => {
+      if (get("SELECT 1 FROM usuarios LIMIT 1"))
+        fail(
+          "O primeiro acesso já foi concluído. Peça um convite ao administrador.",
+          409,
+        );
+      const nome = texto(req.body.nome, "Nome", 80);
+      const email = texto(req.body.email, "E-mail", 150).toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        fail("Informe um e-mail válido.");
+      if (!quartos.includes(req.body.quarto))
+        fail("Selecione um quarto válido.");
+      const hash = passwordHash(req.body.senha);
+      const result = tx(() => {
+        if (get("SELECT 1 FROM usuarios LIMIT 1"))
+          fail(
+            "O primeiro acesso já foi concluído. Peça um convite ao administrador.",
+            409,
+          );
+        let morador = get(
+          "SELECT id FROM moradores WHERE lower(email)=?",
+          email,
+        );
+        const novoMorador = !morador;
+        if (!morador) {
+          morador = { id: randomUUID() };
+          run(
+            "INSERT INTO moradores (id,nome,email,quarto) VALUES (?,?,?,?)",
+            morador.id,
+            nome,
+            email,
+            req.body.quarto,
+          );
+        }
+        const id = randomUUID();
+        run(
+          "INSERT INTO usuarios (id,moradorId,senhaHash,papel,criadoEm) VALUES (?,?,?,?,?)",
+          id,
+          morador.id,
+          hash,
+          "administrador",
+          timestamp(current()),
+        );
+        const user = userById(id);
+        if (novoMorador)
+          audit(publicUser(user), "criar", "morador", morador.id);
+        audit(publicUser(user), "criar", "conta", id, {
+          origem: "primeiro_acesso",
+        });
+        return makeSession(user);
+      });
+      res.status(201).json(result);
+    });
     app.post("/api/auth/login", (req, res) => {
       const email =
         typeof req.body.email === "string"

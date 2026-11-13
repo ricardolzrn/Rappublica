@@ -27,8 +27,8 @@ module.exports = defineConfig({
       env: {
         PORT: "3101",
         DB_PATH: ":memory:",
-        ADMIN_EMAIL: "ricardo@example.com",
-        ADMIN_PASSWORD: "senha-segura-123",
+        ADMIN_EMAIL: "",
+        ADMIN_PASSWORD: "",
       },
       reuseExistingServer: false,
       timeout: 20000,

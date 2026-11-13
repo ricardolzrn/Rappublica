@@ -15,7 +15,9 @@ async function login(page, email, senha) {
 }
 async function logout(page) {
   await tab(page, "Casa");
-  await page.getByRole("button", { name: "Sair da conta" }).click();
+  await page
+    .getByRole("button", { name: "Sair e entrar com outra conta" })
+    .click();
   await expect(
     page.getByRole("button", { name: "Acessar república" }),
   ).toBeVisible();
@@ -28,7 +30,17 @@ test("administrador convida morador existente; cada conta registra apenas seus p
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  await login(page, "ricardo@example.com", "senha-segura-123");
+  await expect(
+    page.getByRole("button", { name: "Criar conta de administrador" }),
+  ).toBeVisible();
+  await page.getByLabel("Nome completo").fill("Ricardo Lazarini");
+  await page.getByLabel("E-mail").fill("ricardo@example.com");
+  await page.getByLabel("Crie uma senha").fill("senha-segura-123");
+  await page.getByLabel("Confirme a senha").fill("senha-segura-123");
+  await page
+    .getByRole("button", { name: "Criar conta de administrador" })
+    .click();
+  await expect(page.getByRole("tab", { name: "Casa" })).toBeVisible();
   await expect(page.getByText(/3 moradores ativos/)).toBeVisible();
   await tab(page, "Casa");
   await page.getByRole("button", { name: "Acessos e convites" }).click();
@@ -44,8 +56,11 @@ test("administrador convida morador existente; cada conta registra apenas seus p
   await expect(page.getByText(/Lucas Fagundes · sem conta/)).toBeVisible();
   await page.reload();
   await logout(page);
+  await expect(
+    page.getByRole("button", { name: "Primeira conta" }),
+  ).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Ativar convite" }).click();
+  await page.getByRole("button", { name: "Criar conta com convite" }).click();
   await page.getByLabel("Código do convite").fill(token);
   await page.getByRole("button", { name: "Verificar convite" }).click();
   await expect(

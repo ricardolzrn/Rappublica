@@ -98,6 +98,7 @@ export function AppProvider({ children }) {
         mes,
         session,
         login: (email, senha) => enter("/auth/login", { email, senha }),
+        createFirstAccount: (form) => enter("/auth/primeiro-acesso", form),
         acceptInvite: (token, senha) =>
           enter("/auth/convites/aceitar", { token, senha }),
         logout,

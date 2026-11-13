@@ -6,12 +6,17 @@ const { join } = require("node:path");
 const { DatabaseSync } = require("node:sqlite");
 const { createApp } = require("./app.cjs");
 async function fixture(t, options = {}) {
+  const { noBootstrap = false, ...databaseOptions } = options;
   const { app, db } = createApp({
-    ...options,
-    bootstrapAdmin: {
-      email: "ricardo@example.com",
-      password: "senha-segura-123",
-    },
+    ...databaseOptions,
+    ...(noBootstrap
+      ? { bootstrapAdmin: false }
+      : {
+          bootstrapAdmin: {
+            email: "ricardo@example.com",
+            password: "senha-segura-123",
+          },
+        }),
   });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((r) => server.once("listening", r));
@@ -36,6 +41,10 @@ async function fixture(t, options = {}) {
       data: res.status === 204 ? null : await res.json(),
     };
   };
+  if (noBootstrap) {
+    api.db = db;
+    return api;
+  }
   const login = await api(
     "/auth/login",
     "POST",
@@ -275,6 +284,129 @@ test("valores brasileiros são interpretados sem truncar centavos", async () => 
   assert.equal(centavos("0,01"), 1);
   for (const v of ["0", "-1", "abc", "1,234", "1.23", "1,2,3", "1000000,01"])
     assert.equal(centavos(v), null);
+});
+
+test("primeiro acesso cria administrador no app uma única vez e permite trocar de conta", async (t) => {
+  const api = await fixture(t, {
+    dbPath: ":memory:",
+    seed: false,
+    noBootstrap: true,
+  });
+  const body = {
+    nome: "Ana Souza",
+    email: "ana@example.com",
+    quarto: "Duplo",
+    senha: "senha-segura-123",
+  };
+  assert.equal((await api("/auth/estado")).data.primeiroAcessoDisponivel, true);
+  assert.equal(
+    (await api("/auth/primeiro-acesso", "POST", { ...body, senha: "curta" }))
+      .status,
+    400,
+  );
+  const attempts = await Promise.all(
+    [1, 2].map(() => api("/auth/primeiro-acesso", "POST", body)),
+  );
+  assert.deepEqual(attempts.map((result) => result.status).sort(), [201, 409]);
+  const session = attempts.find((result) => result.status === 201).data;
+  assert.equal(session.usuario.papel, "administrador");
+  assert.equal(session.usuario.nome, "Ana Souza");
+  assert.equal(
+    (await api("/auth/estado")).data.primeiroAcessoDisponivel,
+    false,
+  );
+  assert.equal(
+    api.db.prepare("SELECT COUNT(*) AS n FROM moradores").get().n,
+    1,
+  );
+  assert.equal(
+    (
+      await api("/auth/primeiro-acesso", "POST", {
+        ...body,
+        email: "outra@example.com",
+      })
+    ).status,
+    409,
+  );
+  assert.equal(
+    (await api("/auth/logout", "POST", {}, session.token)).status,
+    204,
+  );
+  assert.equal(
+    (await api("/auth/me", "GET", undefined, session.token)).status,
+    401,
+  );
+  const login = await api("/auth/login", "POST", {
+    email: body.email,
+    senha: body.senha,
+  });
+  assert.equal(login.status, 200);
+  assert.equal(login.data.usuario.moradorId, session.usuario.moradorId);
+  assert.ok(
+    (await api("/auditoria", "GET", undefined, login.data.token)).data.some(
+      (event) =>
+        event.entidade === "morador" && event.autorNome === "Ana Souza",
+    ),
+  );
+});
+
+test("primeira conta aproveita cadastro e histórico de morador existente", async (t) => {
+  const api = await fixture(t, { dbPath: ":memory:", noBootstrap: true });
+  api.db
+    .prepare("INSERT INTO aceites (regraId,moradorId) VALUES (?,?)")
+    .run("silencio", "lucas");
+  const initialCount = api.db
+    .prepare("SELECT COUNT(*) AS n FROM moradores")
+    .get().n;
+  const signup = await api("/auth/primeiro-acesso", "POST", {
+    nome: "Lucas Fagundes",
+    email: "LUCAS@example.com",
+    quarto: "Suíte",
+    senha: "senha-segura-123",
+  });
+  assert.equal(signup.status, 201);
+  assert.equal(signup.data.usuario.moradorId, "lucas");
+  assert.equal(
+    api.db.prepare("SELECT COUNT(*) AS n FROM moradores").get().n,
+    initialCount,
+  );
+  assert.equal(
+    (
+      await api("/despesas/aluguel", "GET", undefined, signup.data.token)
+    ).data.parcelas.find((p) => p.moradorId === "lucas").paga,
+    true,
+  );
+  assert.ok(
+    (await api("/regras", "GET", undefined, signup.data.token)).data.regras
+      .find((r) => r.id === "silencio")
+      .aceites.includes("lucas"),
+  );
+  const caioInvite = await api(
+    "/convites",
+    "POST",
+    { moradorId: "caio" },
+    signup.data.token,
+  );
+  assert.equal(caioInvite.status, 201);
+  const caio = await api("/auth/convites/aceitar", "POST", {
+    token: caioInvite.data.token,
+    senha: "senha-segura-456",
+  });
+  assert.equal(caio.status, 201);
+  assert.equal(caio.data.usuario.papel, "morador");
+  assert.equal(
+    (await api("/auth/logout", "POST", {}, signup.data.token)).status,
+    204,
+  );
+  assert.equal(
+    (
+      await api("/auth/login", "POST", {
+        email: "caio@example.com",
+        senha: "senha-segura-456",
+      })
+    ).status,
+    200,
+  );
 });
 
 test("login, perfis e permissões impedem alterações em nome de outra pessoa", async (t) => {
