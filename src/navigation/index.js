@@ -14,6 +14,9 @@ import DetalheDespesa from "../screens/DetalheDespesa";
 import CadastrarMorador from "../screens/CadastrarMorador";
 import RegrasCasa from "../screens/RegrasCasa";
 import ConfigRepublica from "../screens/ConfigRepublica";
+import Autenticacao from "../screens/Autenticacao";
+import Acessos from "../screens/Acessos";
+import { useApp } from "../contexts/AppContext";
 const Tab = createBottomTabNavigator(),
   Stack = createNativeStackNavigator();
 const icons = {
@@ -63,6 +66,8 @@ function Tabs() {
   );
 }
 export default function Navigation() {
+  const { session } = useApp();
+  if (!session) return <Autenticacao />;
   return (
     <NavigationContainer
       theme={{
@@ -119,6 +124,13 @@ export default function Navigation() {
           component={ConfigRepublica}
           options={{ title: "Configurações" }}
         />
+        {session.usuario.papel === "administrador" ? (
+          <Stack.Screen
+            name="Acessos"
+            component={Acessos}
+            options={{ title: "Acessos e convites" }}
+          />
+        ) : null}
       </Stack.Navigator>
     </NavigationContainer>
   );

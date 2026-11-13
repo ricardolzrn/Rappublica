@@ -26,13 +26,20 @@ export function normalizeUrl(value) {
     throw new Error("Use uma URL HTTP ou HTTPS sem credenciais ou parâmetros.");
   return url.toString().replace(/\/$/, "");
 }
-export async function request(base, path, { method = "GET", body } = {}) {
+export async function request(
+  base,
+  path,
+  { method = "GET", body, token } = {},
+) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
     const response = await fetch(`${base}${path}`, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       signal: controller.signal,
     });

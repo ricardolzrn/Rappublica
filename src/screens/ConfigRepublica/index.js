@@ -8,7 +8,7 @@ import { Button, Heading, Field, Page, useAction } from "../../components/ui";
 import { s } from "../../theme";
 export default function ConfigRepublica() {
   const r = useResource("/republica"),
-    { apiUrl, preferences, mutate } = useApp();
+    { apiUrl, preferences, mutate, session } = useApp();
   const a = useAction(),
     connection = useAction(),
     cepAction = useAction();
@@ -63,7 +63,7 @@ export default function ConfigRepublica() {
         title="Do seu jeito."
         subtitle="Os dados da casa ficam na API. As preferências ficam neste dispositivo."
       />
-      {r.data ? (
+      {r.data && session.usuario.papel === "administrador" ? (
         <View style={s.card}>
           <Text style={s.section}>Dados da república</Text>
           <Field

@@ -15,7 +15,7 @@ import { moeda, dataBR, statusDespesa } from "../../utils/format";
 export default function DetalheDespesa({ route, navigation }) {
   const { id } = route.params;
   const r = useResource(`/despesas/${id}`),
-    { mutate } = useApp(),
+    { mutate, session } = useApp(),
     a = useAction();
   const [confirm, setConfirm] = useState(false);
   const d = r.data;
@@ -51,7 +51,7 @@ export default function DetalheDespesa({ route, navigation }) {
           </View>
           <Heading
             title="Divisão da conta"
-            subtitle="Marque cada parcela quando o morador acertar sua parte."
+            subtitle="Cada morador registra o pagamento da própria parcela."
           />
           {d.parcelas.map((p) => (
             <View key={p.moradorId} style={[s.card, s.between]}>
@@ -59,14 +59,22 @@ export default function DetalheDespesa({ route, navigation }) {
                 <Text style={[s.text, { fontWeight: "700" }]}>{p.nome}</Text>
                 <Text style={s.section}>{moeda(p.valorCentavos)}</Text>
                 <Badge label={p.paga ? "Pago" : "Pendente"} good={p.paga} />
+                {p.alteradoEm ? (
+                  <Text style={s.small}>
+                    Atualizado por {p.alteradoPorNome} em{" "}
+                    {new Date(p.alteradoEm).toLocaleString("pt-BR")}
+                  </Text>
+                ) : null}
               </View>
-              <Switch
-                accessibilityLabel={`Pagamento de ${p.nome}`}
-                value={p.paga}
-                disabled={a.busy || r.offline}
-                onValueChange={() => pagar(p)}
-                trackColor={{ true: colors.green, false: colors.line }}
-              />
+              {p.moradorId === session.usuario.moradorId ? (
+                <Switch
+                  accessibilityLabel={`Pagamento de ${p.nome}`}
+                  value={p.paga}
+                  disabled={a.busy || r.offline}
+                  onValueChange={() => pagar(p)}
+                  trackColor={{ true: colors.green, false: colors.line }}
+                />
+              ) : null}
             </View>
           ))}
           {a.error && !confirm ? (
@@ -74,20 +82,24 @@ export default function DetalheDespesa({ route, navigation }) {
               {a.error}
             </Text>
           ) : null}
-          <Button
-            title="Editar despesa"
-            secondary
-            icon="create-outline"
-            disabled={r.offline || a.busy}
-            onPress={() => navigation.navigate("CadastrarDespesa", { id })}
-          />
-          <Button
-            title="Excluir despesa"
-            danger
-            icon="trash-outline"
-            disabled={r.offline || a.busy}
-            onPress={() => setConfirm(true)}
-          />
+          {session.usuario.papel === "administrador" ? (
+            <>
+              <Button
+                title="Editar despesa"
+                secondary
+                icon="create-outline"
+                disabled={r.offline || a.busy}
+                onPress={() => navigation.navigate("CadastrarDespesa", { id })}
+              />
+              <Button
+                title="Excluir despesa"
+                danger
+                icon="trash-outline"
+                disabled={r.offline || a.busy}
+                onPress={() => setConfirm(true)}
+              />
+            </>
+          ) : null}
           <Confirm
             error={a.error}
             visible={confirm}

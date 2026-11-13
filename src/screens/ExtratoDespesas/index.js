@@ -15,7 +15,7 @@ import DespesaCard from "../../components/ui/DespesaCard";
 import { s } from "../../theme";
 import { statusDespesa } from "../../utils/format";
 export default function ExtratoDespesas({ navigation }) {
-  const { mes } = useApp();
+  const { mes, session } = useApp();
   const r = useResource(`/despesas?mes=${mes}`);
   const [busca, setBusca] = useState(""),
     [filtro, setFiltro] = useState("Todas");
@@ -44,11 +44,13 @@ export default function ExtratoDespesas({ navigation }) {
             subtitle="Cada conta no seu lugar. Cada parcela transparente."
           />
           <MonthPicker />
-          <Button
-            title="Nova despesa"
-            icon="add"
-            onPress={() => navigation.navigate("CadastrarDespesa")}
-          />
+          {session.usuario.papel === "administrador" ? (
+            <Button
+              title="Nova despesa"
+              icon="add"
+              onPress={() => navigation.navigate("CadastrarDespesa")}
+            />
+          ) : null}
           <Field
             label="Buscar despesa"
             placeholder="Aluguel, luz, mercado…"

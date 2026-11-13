@@ -1,6 +1,7 @@
 const express = require("express");
 const { createDatabase } = require("./database.cjs");
 const { createRepository } = require("./repository.cjs");
+const { createAuth } = require("./auth.cjs");
 function createApp(options = {}) {
   const store = createDatabase(options);
   const { db } = store;
@@ -12,12 +13,13 @@ function createApp(options = {}) {
       "Access-Control-Allow-Methods",
       "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     );
-    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") return res.sendStatus(204);
     next();
   });
   app.use(express.json({ limit: "32kb" }));
-  const dependencies = { ...store, ...createRepository(store) };
+  const auth = createAuth(store, options);
+  const dependencies = { ...store, ...createRepository(store), ...auth };
   app.use((req, res, next) => {
     if (
       ["POST", "PUT", "PATCH"].includes(req.method) &&
@@ -27,6 +29,9 @@ function createApp(options = {}) {
     next();
   });
   app.get("/api/health", (req, res) => res.json({ status: "ok" }));
+  auth.registerPublic(app);
+  app.use("/api", auth.authenticate);
+  auth.registerPrivate(app);
   for (const name of ["republica", "moradores", "despesas", "regras", "resumo"])
     require(`./routes/${name}.cjs`)(app, dependencies);
   app.use((req, res) =>

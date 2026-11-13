@@ -179,8 +179,8 @@ export default function CadastrarDespesa({ route, navigation }) {
           ) : null}
           {id ? (
             <Text style={s.small}>
-              Para alterar o valor ou os participantes de uma conta com
-              pagamentos, primeiro desmarque os pagamentos nos detalhes.
+              Valor e participantes de uma conta com pagamentos registrados só
+              podem mudar após os próprios moradores desmarcarem suas parcelas.
             </Text>
           ) : null}
           {a.error ? (

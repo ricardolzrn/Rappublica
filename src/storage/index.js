@@ -6,3 +6,6 @@ export async function read(key) {
 export async function write(key, value) {
   await AsyncStorage.setItem(`@rappublica/v1/${key}`, JSON.stringify(value));
 }
+export async function remove(key) {
+  await AsyncStorage.removeItem(`@rappublica/v1/${key}`);
+}

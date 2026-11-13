@@ -8,7 +8,7 @@ import DespesaCard from "../../components/ui/DespesaCard";
 import { colors, s } from "../../theme";
 import { moeda } from "../../utils/format";
 export default function Inicio({ navigation }) {
-  const { mes } = useApp();
+  const { mes, session } = useApp();
   const resource = useResource(`/resumo?mes=${mes}`);
   const d = resource.data;
   return (
@@ -117,11 +117,13 @@ export default function Inicio({ navigation }) {
               </Text>
             </View>
           </View>
-          <Button
-            title="Nova despesa"
-            icon="add"
-            onPress={() => navigation.navigate("CadastrarDespesa")}
-          />
+          {session.usuario.papel === "administrador" ? (
+            <Button
+              title="Nova despesa"
+              icon="add"
+              onPress={() => navigation.navigate("CadastrarDespesa")}
+            />
+          ) : null}
           <View style={s.between}>
             <Text style={s.section}>Contas a acertar</Text>
             <Text style={s.small}>Por vencimento</Text>

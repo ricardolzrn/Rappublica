@@ -24,7 +24,12 @@ module.exports = defineConfig({
     {
       command: "npm run api",
       url: "http://localhost:3101/api/health",
-      env: { PORT: "3101", DB_PATH: ":memory:" },
+      env: {
+        PORT: "3101",
+        DB_PATH: ":memory:",
+        ADMIN_EMAIL: "ricardo@example.com",
+        ADMIN_PASSWORD: "senha-segura-123",
+      },
       reuseExistingServer: false,
       timeout: 20000,
     },

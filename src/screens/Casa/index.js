@@ -4,8 +4,10 @@ import { Ionicons } from "@expo/vector-icons";
 import useResource from "../../hooks/useResource";
 import { Heading, Icon, Page } from "../../components/ui";
 import { colors, s } from "../../theme";
+import { useApp } from "../../contexts/AppContext";
 export default function Casa({ navigation }) {
   const r = useResource("/republica");
+  const { session, logout } = useApp();
   return (
     <Page resource={r}>
       <Heading
@@ -47,6 +49,16 @@ export default function Casa({ navigation }) {
           icon: "settings-outline",
           route: "ConfigRepublica",
         },
+        ...(session.usuario.papel === "administrador"
+          ? [
+              {
+                title: "Acessos e convites",
+                text: "Contas, convites e alterações recentes",
+                icon: "key-outline",
+                route: "Acessos",
+              },
+            ]
+          : []),
       ].map((item) => (
         <Pressable
           key={item.route}
@@ -63,6 +75,23 @@ export default function Casa({ navigation }) {
           <Ionicons name="chevron-forward" color={colors.muted} size={20} />
         </Pressable>
       ))}
+      <View style={s.card}>
+        <Text style={s.section}>{session.usuario.nome}</Text>
+        <Text style={s.subtitle}>
+          {session.usuario.email} · {session.usuario.papel}
+        </Text>
+        <Text style={s.small}>
+          Pagamentos e aceites só podem ser registrados para sua própria conta.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Sair da conta"
+          onPress={logout}
+          style={[s.chip, { alignItems: "center" }]}
+        >
+          <Text style={s.chipText}>Sair da conta</Text>
+        </Pressable>
+      </View>
       <Text style={[s.small, { textAlign: "center", marginTop: 10 }]}>
         Rappublica · vida compartilhada, contas organizadas.
       </Text>

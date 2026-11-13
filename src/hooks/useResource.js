@@ -4,7 +4,7 @@ import { useApp } from "../contexts/AppContext";
 import { request } from "../services/api";
 import { read, write } from "../storage";
 export default function useResource(path) {
-  const { apiUrl } = useApp();
+  const { apiUrl, session, expireSession } = useApp();
   const [state, setState] = useState({
     data: null,
     loading: true,
@@ -16,10 +16,10 @@ export default function useResource(path) {
   const generation = useRef(0);
   const reload = useCallback(async () => {
     const id = ++generation.current;
-    const key = `cache/${apiUrl}${path}`;
+    const key = `cache/${apiUrl}/${session?.usuario.id}${path}`;
     setState((s) => ({ ...s, loading: true, error: "" }));
     try {
-      const data = await request(apiUrl, path);
+      const data = await request(apiUrl, path, { token: session?.token });
       if (id !== generation.current) return;
       const cachedAt = new Date().toISOString();
       let notice = "";
@@ -39,6 +39,7 @@ export default function useResource(path) {
           notice,
         });
     } catch (error) {
+      if (error.status === 401) await expireSession();
       let cache = null;
       if (error.offline)
         try {
@@ -54,7 +55,7 @@ export default function useResource(path) {
           notice: "",
         });
     }
-  }, [apiUrl, path]);
+  }, [apiUrl, path, session?.token, session?.usuario.id]);
   useFocusEffect(
     useCallback(() => {
       setState({ data: null, loading: true, error: "", offline: false });

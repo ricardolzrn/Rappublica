@@ -15,7 +15,7 @@ import { colors, s } from "../../theme";
 import { moeda } from "../../utils/format";
 export default function ListaMoradores({ navigation }) {
   const r = useResource("/moradores"),
-    { mutate } = useApp(),
+    { mutate, session } = useApp(),
     a = useAction();
   const [selected, setSelected] = useState(null);
   const excluir = () =>
@@ -38,11 +38,13 @@ export default function ListaMoradores({ navigation }) {
               title="Quem divide a casa"
               subtitle="Moradores, quartos e acertos em um só lugar."
             />
-            <Button
-              title="Novo morador"
-              icon="person-add-outline"
-              onPress={() => navigation.navigate("CadastrarMorador")}
-            />
+            {session.usuario.papel === "administrador" ? (
+              <Button
+                title="Novo morador"
+                icon="person-add-outline"
+                onPress={() => navigation.navigate("CadastrarMorador")}
+              />
+            ) : null}
             <Feedback resource={r} />
             {a.error && !selected ? (
               <Text accessibilityRole="alert" style={s.error}>
@@ -101,31 +103,33 @@ export default function ListaMoradores({ navigation }) {
               }
               good={!item.pendenteCentavos}
             />
-            <View style={s.row}>
-              <View style={{ flex: 1 }}>
-                <Button
-                  title="Editar"
-                  accessibilityLabel={`Editar ${item.nome}`}
-                  secondary
-                  disabled={r.offline || a.busy}
-                  onPress={() =>
-                    navigation.navigate("CadastrarMorador", { id: item.id })
-                  }
-                />
+            {session.usuario.papel === "administrador" ? (
+              <View style={s.row}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Editar"
+                    accessibilityLabel={`Editar ${item.nome}`}
+                    secondary
+                    disabled={r.offline || a.busy}
+                    onPress={() =>
+                      navigation.navigate("CadastrarMorador", { id: item.id })
+                    }
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Excluir"
+                    accessibilityLabel={`Excluir ${item.nome}`}
+                    secondary
+                    disabled={r.offline || a.busy}
+                    onPress={() => {
+                      a.setError("");
+                      setSelected(item);
+                    }}
+                  />
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Button
-                  title="Excluir"
-                  accessibilityLabel={`Excluir ${item.nome}`}
-                  secondary
-                  disabled={r.offline || a.busy}
-                  onPress={() => {
-                    a.setError("");
-                    setSelected(item);
-                  }}
-                />
-              </View>
-            </View>
+            ) : null}
           </View>
         )}
       />

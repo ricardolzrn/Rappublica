@@ -14,7 +14,29 @@ function createDatabase({
     CREATE TABLE IF NOT EXISTS despesas (id TEXT PRIMARY KEY, descricao TEXT NOT NULL, valorCentavos INTEGER NOT NULL, categoria TEXT NOT NULL, tipo TEXT NOT NULL, vencimento TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS parcelas (despesaId TEXT NOT NULL REFERENCES despesas(id) ON DELETE CASCADE, moradorId TEXT NOT NULL REFERENCES moradores(id), valorCentavos INTEGER NOT NULL, paga INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (despesaId, moradorId));
     CREATE TABLE IF NOT EXISTS regras (id TEXT PRIMARY KEY, titulo TEXT NOT NULL, texto TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS aceites (regraId TEXT NOT NULL REFERENCES regras(id) ON DELETE CASCADE, moradorId TEXT NOT NULL REFERENCES moradores(id) ON DELETE CASCADE, PRIMARY KEY (regraId, moradorId));`);
+    CREATE TABLE IF NOT EXISTS aceites (regraId TEXT NOT NULL REFERENCES regras(id) ON DELETE CASCADE, moradorId TEXT NOT NULL REFERENCES moradores(id) ON DELETE CASCADE, PRIMARY KEY (regraId, moradorId));
+    CREATE TABLE IF NOT EXISTS usuarios (id TEXT PRIMARY KEY, moradorId TEXT NOT NULL UNIQUE REFERENCES moradores(id), senhaHash TEXT NOT NULL, papel TEXT NOT NULL CHECK (papel IN ('administrador','morador')), criadoEm TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS sessoes (tokenHash TEXT PRIMARY KEY, usuarioId TEXT NOT NULL REFERENCES usuarios(id), criadoEm TEXT NOT NULL, expiraEm TEXT NOT NULL, revogadoEm TEXT);
+    CREATE TABLE IF NOT EXISTS convites (id TEXT PRIMARY KEY, moradorId TEXT NOT NULL REFERENCES moradores(id), tokenHash TEXT NOT NULL UNIQUE, papel TEXT NOT NULL CHECK (papel IN ('administrador','morador')), criadoPor TEXT NOT NULL REFERENCES usuarios(id), criadoEm TEXT NOT NULL, expiraEm TEXT NOT NULL, usadoEm TEXT, revogadoEm TEXT);
+    CREATE TABLE IF NOT EXISTS auditoria (id TEXT PRIMARY KEY, autorUsuarioId TEXT NOT NULL REFERENCES usuarios(id), autorMoradorId TEXT NOT NULL, autorNome TEXT NOT NULL, acao TEXT NOT NULL, entidade TEXT NOT NULL, entidadeId TEXT NOT NULL, detalhes TEXT, criadoEm TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS idx_auditoria_data ON auditoria(criadoEm DESC);
+    CREATE INDEX IF NOT EXISTS idx_convites_morador ON convites(moradorId);`);
+  // As colunas novas são opcionais para não atribuir autores aos dados anteriores ao login.
+  const columns = (table) =>
+    new Set(
+      db
+        .prepare(`PRAGMA table_info(${table})`)
+        .all()
+        .map((c) => c.name),
+    );
+  if (!columns("parcelas").has("alteradoPor"))
+    db.exec("ALTER TABLE parcelas ADD COLUMN alteradoPor TEXT");
+  if (!columns("parcelas").has("alteradoEm"))
+    db.exec("ALTER TABLE parcelas ADD COLUMN alteradoEm TEXT");
+  if (!columns("aceites").has("aceitoPor"))
+    db.exec("ALTER TABLE aceites ADD COLUMN aceitoPor TEXT");
+  if (!columns("aceites").has("aceitoEm"))
+    db.exec("ALTER TABLE aceites ADD COLUMN aceitoEm TEXT");
   const all = (sql, ...args) => db.prepare(sql).all(...args);
   const get = (sql, ...args) => db.prepare(sql).get(...args);
   const run = (sql, ...args) => db.prepare(sql).run(...args);
@@ -56,7 +78,7 @@ function createDatabase({
           run("INSERT INTO despesas VALUES (?,?,?,?,?,?)", ...row);
           ["lucas", "caio", "ricardo"].forEach((id) =>
             run(
-              "INSERT INTO parcelas VALUES (?,?,?,?)",
+              "INSERT INTO parcelas (despesaId,moradorId,valorCentavos,paga) VALUES (?,?,?,?)",
               row[0],
               id,
               row[2] / 3,

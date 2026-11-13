@@ -15,7 +15,7 @@ import {
 import { colors, s } from "../../theme";
 export default function RegrasCasa() {
   const r = useResource("/regras"),
-    { mutate } = useApp(),
+    { mutate, session } = useApp(),
     a = useAction();
   const [form, setForm] = useState({ titulo: "", texto: "" }),
     [editing, setEditing] = useState(null),
@@ -58,49 +58,51 @@ export default function RegrasCasa() {
       />
       {r.data ? (
         <>
-          <View style={s.card}>
-            <Text style={s.section}>
-              {editing ? "Editar combinado" : "Novo combinado"}
-            </Text>
-            <Field
-              label="Título da regra"
-              placeholder="Ex.: Limpeza da cozinha"
-              maxLength={100}
-              value={form.titulo}
-              onChangeText={(v) => setForm((f) => ({ ...f, titulo: v }))}
-            />
-            <Field
-              label="Descrição da regra"
-              placeholder="O que todos precisam saber?"
-              multiline
-              maxLength={1000}
-              value={form.texto}
-              onChangeText={(v) => setForm((f) => ({ ...f, texto: v }))}
-            />
-            {editing ? (
-              <Text style={s.small}>
-                Ao salvar a edição, os aceites serão limpos para que todos
-                confirmem a nova versão.
+          {session.usuario.papel === "administrador" ? (
+            <View style={s.card}>
+              <Text style={s.section}>
+                {editing ? "Editar combinado" : "Novo combinado"}
               </Text>
-            ) : null}
-            <Button
-              title={editing ? "Salvar regra" : "Adicionar regra"}
-              icon="checkmark"
-              loading={a.busy}
-              disabled={r.offline}
-              onPress={save}
-            />
-            {editing ? (
-              <Button
-                title="Cancelar edição"
-                secondary
-                onPress={() => {
-                  setEditing(null);
-                  setForm({ titulo: "", texto: "" });
-                }}
+              <Field
+                label="Título da regra"
+                placeholder="Ex.: Limpeza da cozinha"
+                maxLength={100}
+                value={form.titulo}
+                onChangeText={(v) => setForm((f) => ({ ...f, titulo: v }))}
               />
-            ) : null}
-          </View>
+              <Field
+                label="Descrição da regra"
+                placeholder="O que todos precisam saber?"
+                multiline
+                maxLength={1000}
+                value={form.texto}
+                onChangeText={(v) => setForm((f) => ({ ...f, texto: v }))}
+              />
+              {editing ? (
+                <Text style={s.small}>
+                  Ao salvar a edição, os aceites serão limpos para que todos
+                  confirmem a nova versão.
+                </Text>
+              ) : null}
+              <Button
+                title={editing ? "Salvar regra" : "Adicionar regra"}
+                icon="checkmark"
+                loading={a.busy}
+                disabled={r.offline}
+                onPress={save}
+              />
+              {editing ? (
+                <Button
+                  title="Cancelar edição"
+                  secondary
+                  onPress={() => {
+                    setEditing(null);
+                    setForm({ titulo: "", texto: "" });
+                  }}
+                />
+              ) : null}
+            </View>
+          ) : null}
           {a.error && !selected ? (
             <Text accessibilityRole="alert" style={s.error}>
               {a.error}
@@ -126,43 +128,64 @@ export default function RegrasCasa() {
                   regra.aceites.length === r.data.moradores.length
                 }
               />
-              <View style={s.row}>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Editar"
-                    accessibilityLabel={`Editar regra: ${regra.titulo}`}
-                    secondary
-                    disabled={r.offline || a.busy}
-                    onPress={() => {
-                      setEditing(regra.id);
-                      setForm({ titulo: regra.titulo, texto: regra.texto });
-                    }}
-                  />
+              {session.usuario.papel === "administrador" ? (
+                <View style={s.row}>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      title="Editar"
+                      accessibilityLabel={`Editar regra: ${regra.titulo}`}
+                      secondary
+                      disabled={r.offline || a.busy}
+                      onPress={() => {
+                        setEditing(regra.id);
+                        setForm({ titulo: regra.titulo, texto: regra.texto });
+                      }}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      title="Excluir"
+                      accessibilityLabel={`Excluir regra: ${regra.titulo}`}
+                      secondary
+                      disabled={r.offline || a.busy}
+                      onPress={() => {
+                        a.setError("");
+                        setSelected(regra.id);
+                      }}
+                    />
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Excluir"
-                    accessibilityLabel={`Excluir regra: ${regra.titulo}`}
-                    secondary
-                    disabled={r.offline || a.busy}
-                    onPress={() => {
-                      a.setError("");
-                      setSelected(regra.id);
-                    }}
-                  />
-                </View>
-              </View>
+              ) : null}
               <View style={s.separator} />
               {r.data.moradores.map((m) => (
                 <View key={m.id} style={s.between}>
-                  <Text style={[s.text, { flex: 1 }]}>{m.nome}</Text>
-                  <Switch
-                    accessibilityLabel={`Aceite de ${m.nome} para ${regra.titulo}`}
-                    value={regra.aceites.includes(m.id)}
-                    disabled={r.offline || a.busy}
-                    onValueChange={(v) => accept(regra.id, m.id, v)}
-                    trackColor={{ true: colors.green, false: colors.line }}
-                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.text}>
+                      {m.nome} ·{" "}
+                      {regra.aceites.includes(m.id) ? "Aceitou" : "Pendente"}
+                    </Text>
+                    {regra.detalhesAceites?.find(
+                      (item) => item.moradorId === m.id,
+                    )?.aceitoEm ? (
+                      <Text style={s.small}>
+                        Em{" "}
+                        {new Date(
+                          regra.detalhesAceites.find(
+                            (item) => item.moradorId === m.id,
+                          ).aceitoEm,
+                        ).toLocaleString("pt-BR")}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {m.id === session.usuario.moradorId ? (
+                    <Switch
+                      accessibilityLabel={`Aceite de ${m.nome} para ${regra.titulo}`}
+                      value={regra.aceites.includes(m.id)}
+                      disabled={r.offline || a.busy}
+                      onValueChange={(v) => accept(regra.id, m.id, v)}
+                      trackColor={{ true: colors.green, false: colors.line }}
+                    />
+                  ) : null}
                 </View>
               ))}
             </View>
